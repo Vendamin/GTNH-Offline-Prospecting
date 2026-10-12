@@ -1,4 +1,5 @@
 import csv
+import io
 import json
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -104,9 +105,19 @@ def find_data_dir():
             return c_dir
     raise FileNotFoundError("Could not find 'oredict.csv' and 'block.csv'")
 
+def open_dump_csv(path):
+    # NEI writes dumps in the platform default encoding (cp1252 on Windows), so § color codes aren't valid UTF-8
+    raw = path.read_bytes()
+    for encoding in ("utf-8-sig", "cp1252"):
+        try:
+            return io.StringIO(raw.decode(encoding), newline="")
+        except UnicodeDecodeError:
+            continue
+    return io.StringIO(raw.decode("latin-1"), newline="")
+
 def load_block_lookup(data_dir):
     lookup = {}
-    with (data_dir / "block.csv").open("r", encoding="utf-8-sig", newline="") as h:
+    with open_dump_csv(data_dir / "block.csv") as h:
         for row in csv.DictReader(h):
             b_id = parse_optional_int(row.get("ID"))
             if b_id is not None:
@@ -115,7 +126,7 @@ def load_block_lookup(data_dir):
 
 def load_oredict_lookup(data_dir):
     lookup = {}
-    with (data_dir / "oredict.csv").open("r", encoding="utf-8-sig", newline="") as h:
+    with open_dump_csv(data_dir / "oredict.csv") as h:
         for row in csv.DictReader(h):
             i_id = normalize_identifier(row.get("Item ID"))
             is_id = parse_itemstack_identifier(row.get("ItemStack"))
