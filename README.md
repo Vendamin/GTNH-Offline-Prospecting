@@ -6,7 +6,7 @@ An external web application for parsing and rendering GregTech: New Horizons (GT
 
 ## GTNH Version
 Recommented version: `2.8+`.  
-Tested on `2.8.4`, `2.9 Beta 1`, `2.9 Beta 2`.
+Tested on `2.8.4`, `2.9.0`
 
 ## Prerequisites: Data Dumps
 **Only works on already loaded chunks!**  
@@ -17,8 +17,8 @@ Before using the prospector, you must extract block and ore dictionary data dire
 2. Open your inventory and click the **Options** button (bottom left corner) to open the NEI Config.
 3. Navigate to **Tools** -> **Data Dumps**.
 4. Click on **Blocks** to generate the block dump.
-5. Go back to Data Dumps, select **NEI Integration**, and dump the **Ore Dictionary**.
-6. Open your `.minecraft/dumps/` folder, find `block.csv` and `oredict.csv`, and copy them into the `dumps/` folder inside this application's directory.
+5. In same menu select **NEI Integration**, and dump the **Ore Dictionary** and **Fluid Dictionary**.
+6. Open your `.minecraft/dumps/` folder, find `block.csv`, `oredict.csv`, and `fluid.csv`, and copy them into the `dumps/` folder inside this application's directory.
 
 ## How to Start
 1. Ensure you have **Python 3.8 or newer** installed from [python.org](https://www.python.org/).

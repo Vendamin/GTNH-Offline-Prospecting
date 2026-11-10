@@ -116,9 +116,19 @@
                             </div>
                         </div>
                         
-                        <div class="form-check form-switch mb-4">
-                            <input class="form-check-input" type="checkbox" name="only_ores" {% if settings.only_ores %}checked{% endif %}>
-                            <label class="form-check-label">Only Process Ores</label>
+                        <div class="mb-4" role="group" aria-labelledby="processingFilterLabel">
+                            <div id="processingFilterLabel" class="form-label mb-2">Processing filter</div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="only_ores" id="onlyOresInput"
+                                       {% if settings.only_ores %}checked{% endif %}>
+                                <label class="form-check-label" for="onlyOresInput">Only Process Ores</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="only_ores_and_fluids" id="onlyOresAndFluidsInput"
+                                       {% if settings.only_ores_and_fluids %}checked{% endif %}>
+                                <label class="form-check-label" for="onlyOresAndFluidsInput">Only Process Ores and Fluids</label>
+                            </div>
+                            <div class="form-text">Choose at most one filter.</div>
                         </div>
                         <button type="submit" class="btn btn-primary w-100 py-2">Save Configuration</button>
                     </form>
@@ -443,6 +453,27 @@
             fetchRegions();
         }
     });
+
+    function updateProcessingFilters(changedCheckbox) {
+        const onlyOres = document.getElementById('onlyOresInput');
+        const onlyOresAndFluids = document.getElementById('onlyOresAndFluidsInput');
+
+        if (changedCheckbox === onlyOresAndFluids && onlyOresAndFluids.checked) {
+            onlyOres.checked = false;
+        } else if (changedCheckbox === onlyOres && onlyOres.checked) {
+            onlyOresAndFluids.checked = false;
+        }
+    }
+
+    document.getElementById('onlyOresInput').addEventListener('change', function () {
+        updateProcessingFilters(this);
+    });
+    document.getElementById('onlyOresAndFluidsInput').addEventListener('change', function () {
+        updateProcessingFilters(this);
+    });
+
+    // Normalize old settings where both options may have been enabled.
+    updateProcessingFilters(document.getElementById('onlyOresAndFluidsInput'));
 </script>
 </body>
 </html>

@@ -13,6 +13,7 @@ DEFAULT_SETTINGS = {
     "skip_block_ids": "7,1,2,3,9,12,13,24,80,11,87,88,1202,121,1379,1418",
     "cpu_usage": 75,
     "only_ores": True,
+    "only_ores_and_fluids": False,
     "dump_dir": "dumps",
     "export_dir": "data"
 }
@@ -138,6 +139,7 @@ def save_config():
         "skip_block_ids": request.form.get("skip_block_ids", "").strip(),
         "cpu_usage": cpu_val,
         "only_ores": "only_ores" in request.form,
+        "only_ores_and_fluids": "only_ores_and_fluids" in request.form,
         "dump_dir": request.form.get("dump_dir", "dumps").strip(),
         "export_dir": current_settings.get("export_dir", "data")
     }
@@ -214,6 +216,7 @@ def start_prospecting():
         "--skip-block-ids", settings["skip_block_ids"]
     ]
     if settings["only_ores"]: cmd.append("--only-ores")
+    if settings["only_ores_and_fluids"]: cmd.append("--only-ores-and-fluids")
     if regions_input: cmd.extend(["--regions", regions_input])
         
     try:
@@ -322,4 +325,4 @@ def get_dimension_data(dimension, filename):
     return send_from_directory(os.path.join(load_settings()["export_dir"], dimension), filename)
 
 if __name__ == "__main__":
-    app.run(port=5050)
+    app.run(host="0.0.0.0", port=5050)

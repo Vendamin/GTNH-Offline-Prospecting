@@ -20,7 +20,25 @@ parser.add_argument("--dump-dir", type=str, default=str(SCRIPT_DIR/"dumps"), hel
 parser.add_argument("--export-dir", type=str, default=str(SCRIPT_DIR/"data"), help="Path to the export directory")
 parser.add_argument("--cpu-usage", type=float, default=0.75, help="Fraction of CPU to use (0.0 to 1.0)")
 parser.add_argument("--skip-block-ids", type=str, default="0,7,1,2,3,9,12,13,24,80,11,87,88,1202,121,1379,1418", help="Comma-separated list of block IDs to skip")
+# 0 - air
+# 1 - stone
+# 2 - grass
+# 3 - dirt
+# 7 - bedrock
+# 9 - water
+# 11 - lava
+# 12 - sand
+# 13 - gravel
+# 24 - sandstone
+# 80 - snow
+# 87 - netherrack
+# 88 - soul sand
+# 121 - end_stone
+# 1202 - cloud
+# 1379 - end_stone_terrain
+# 1418 - ender_goo
 parser.add_argument("--only-ores", action="store_true", help="Only process ores (skip non-ore blocks)")
+parser.add_argument("--only-ores-and-fluids", action="store_true", help="Only process ores and fluids (skip non-ore blocks)")
 args = parser.parse_args()
 
 CPU_USAGE_FRACTION = max(0.0, min(1.0, args.cpu_usage))
@@ -36,9 +54,12 @@ EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 W_BLOCK_LOOKUP = {}
 W_OREDICT_LOOKUP = {}
+W_FLUIDS_LOOKUP = {}
 W_ORES_IDS = set()
 W_SKIPPED_IDS = set()
+W_FLUIDS_IDS = set()
 W_ONLY_ORES = False
+W_ONLY_ORES_AND_FLUIDS = False
 W_CACHE = {} 
 
 def is_ore_registry_name(registry_name):
@@ -46,21 +67,33 @@ def is_ore_registry_name(registry_name):
     rn = str(registry_name).lower()
     return "blockores" in rn or "_ore" in rn or rn.endswith("ore")
 
-def init_worker(data_dir, skipped_ids_str, only_ores):
-    global W_BLOCK_LOOKUP, W_OREDICT_LOOKUP, W_ORES_IDS, W_SKIPPED_IDS, W_ONLY_ORES
+def init_worker(data_dir, skipped_ids_str, only_ores, only_ores_and_fluids):
+    global W_BLOCK_LOOKUP, W_OREDICT_LOOKUP, W_ORES_IDS, W_SKIPPED_IDS, W_ONLY_ORES, W_FLUIDS_LOOKUP, W_FLUIDS_IDS, W_ONLY_ORES_AND_FLUIDS
     
     W_ONLY_ORES = only_ores
+    W_ONLY_ORES_AND_FLUIDS = only_ores_and_fluids
+
     W_SKIPPED_IDS = set(int(x.strip()) for x in skipped_ids_str.split(",")) if skipped_ids_str else set()
     W_SKIPPED_IDS.add(0)
     
     W_BLOCK_LOOKUP = load_block_lookup(data_dir)
     W_OREDICT_LOOKUP = load_oredict_lookup(data_dir)
-    
+    W_FLUIDS_LOOKUP = load_fluids_lookup(data_dir)
+
     W_ORES_IDS = set()
     for b_id, info in W_BLOCK_LOOKUP.items():
         reg_name = normalize_identifier(info.get("name"))
         if is_ore_registry_name(reg_name):
             W_ORES_IDS.add(b_id)
+
+    W_FLUIDS_IDS = set()
+    for f_id in W_FLUIDS_LOOKUP.keys():
+        for b_id, info in W_BLOCK_LOOKUP.items():
+            reg_name = normalize_identifier(info.get("name"))
+            if reg_name == f_id:
+                W_FLUIDS_IDS.add(b_id)
+                break
+
 
 def read_nibble(byte_array, index):
     value = byte_array[index // 2]
@@ -124,6 +157,15 @@ def load_oredict_lookup(data_dir):
             if not i_id or meta is None or not d_name: continue
             for lookup_id in {i_id, is_id}:
                 if lookup_id: lookup[(lookup_id, meta)] = d_name
+    return lookup
+
+def load_fluids_lookup(data_dir):
+    lookup = {}
+    with (data_dir / "fluid.csv").open("r", encoding="utf-8-sig", newline="") as h:
+        for row in csv.DictReader(h):
+            f_id = normalize_identifier(row.get("Block ID"))
+            d_name = row.get("Localized Name", "").strip()
+            if f_id and d_name: lookup[f_id] = d_name
     return lookup
 
 def decode_section_block(section, index):
@@ -254,7 +296,7 @@ def process_and_save_region(file_path, export_dir_str, progress_queue):
                             chunk_blocks.append([abs_x, abs_y, abs_z, block_id, b_meta, int(small)])
                     except Exception: continue
             
-            if (not TileEntityOres or not W_ONLY_ORES or True):
+            if (not TileEntityOres or not W_ONLY_ORES or not W_ONLY_ORES_AND_FLUIDS or True):
                 sections = level["Sections"] if "Sections" in [t.name for t in level.tags] else []
 
                 for section in sections:
@@ -265,7 +307,10 @@ def process_and_save_region(file_path, export_dir_str, progress_queue):
                                 index = (local_y << 8) | (local_z << 4) | local_x
                                 block_id, block_data, small = decode_section_block(section, index)
 
-                                if W_ONLY_ORES and block_id not in W_ORES_IDS: continue
+                                if W_ONLY_ORES_AND_FLUIDS:
+                                    if block_id not in W_ORES_IDS and block_id not in W_FLUIDS_IDS: continue
+                                elif W_ONLY_ORES and block_id not in W_ORES_IDS: continue
+
                                 if block_id in W_SKIPPED_IDS: continue
 
                                 b_name, b_meta = resolve_block_name_and_meta(block_id, block_data)
@@ -369,7 +414,7 @@ def main():
 
         global_dictionary = {} 
 
-        with ProcessPoolExecutor(max_workers=max_workers, initializer=init_worker, initargs=(data_dir, args.skip_block_ids, args.only_ores)) as executor:
+        with ProcessPoolExecutor(max_workers=max_workers, initializer=init_worker, initargs=(data_dir, args.skip_block_ids, args.only_ores, args.only_ores_and_fluids)) as executor:
             futures = [executor.submit(process_and_save_region, f, str(EXPORT_DIR), progress_queue) for f in region_files]
             for future in as_completed(futures):
                 completed_regions[0] += 1
